@@ -630,7 +630,7 @@ function SheetsSetup({students}){
 // ── STAFF ────────────────────────────────────────────────────────────────────
 function StaffDashboard({session,onLogout}){
   const [tab,setTab]=useState('overview');
-  const [students]=useState(()=>lsGet('afcll_v2_students')||[]);
+  const [students]=useState(()=>lsGet('afcll_v2_students')||DEF_STUDENTS);
   const [att,setAtt]=useState(()=>lsGet('afcll_v2_att')||[]);
   const [hw]=useState(()=>lsGet('afcll_v2_hw')||[]);
   const [acts]=useState(()=>lsGet('afcll_v2_acts')||[]);
@@ -1130,8 +1130,8 @@ function ParentDashboard({session,onLogout}){
 // ── ADMIN DASHBOARD ──────────────────────────────────────────────────────────
 function AdminDashboard({session,onLogout}){
   const [tab,setTab]=useState('confirm');
-  const [students,setStudents]=useState(()=>lsGet('afcll_v2_students')||[]);
-  const [staffList,setStaffList]=useState(()=>lsGet('afcll_v2_staff')||[]);
+  const [students,setStudents]=useState(()=>lsGet('afcll_v2_students')||DEF_STUDENTS);
+  const [staffList,setStaffList]=useState(()=>lsGet('afcll_v2_staff')||DEF_STAFF);
   const [att,setAtt]=useState(()=>lsGet('afcll_v2_att')||[]);
   const [hw]=useState(()=>lsGet('afcll_v2_hw')||[]);
   const [acts]=useState(()=>lsGet('afcll_v2_acts')||[]);
