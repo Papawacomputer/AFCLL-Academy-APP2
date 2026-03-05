@@ -83,19 +83,11 @@ const DEF_STAFF=[
 const ACTIVITIES=['Tutoring','Sports','Art & Crafts','STEM Club','Reading Circle','Music','Drama','Community Service'];
 
 function initData(){
-  // Version key — bump this any time students/staff defaults change
-  const DATA_VERSION='v5.1';
-  const storedVersion=localStorage.getItem('afcll_data_version');
-  if(storedVersion!==DATA_VERSION){
-    // New version: reset students and staff to latest defaults
-    // Preserve existing attendance, homework, activities
-    lsSet('afcll_v2_students',DEF_STUDENTS);
-    lsSet('afcll_v2_staff',DEF_STAFF);
-    localStorage.setItem('afcll_data_version',DATA_VERSION);
-  }
+  if(!lsGet('afcll_v2_students')) lsSet('afcll_v2_students',DEF_STUDENTS);
   if(!lsGet('afcll_v2_att')) lsSet('afcll_v2_att',[]);
   if(!lsGet('afcll_v2_hw')) lsSet('afcll_v2_hw',[]);
   if(!lsGet('afcll_v2_acts')) lsSet('afcll_v2_acts',[]);
+  if(!lsGet('afcll_v2_staff')) lsSet('afcll_v2_staff',DEF_STAFF);
 }
 
 function today(){return new Date().toISOString().slice(0,10);}
@@ -137,16 +129,16 @@ function LoginScreen({onLogin}){
   const PAD=['1','2','3','4','5','6','7','8','9','','0','\u232b'];
 
   const go=()=>{
-    // Always use DEF_STUDENTS and DEF_STAFF for login - never rely on localStorage for credentials
-    const students=[...DEF_STUDENTS,...(lsGet('afcll_v2_students')||[]).filter(s=>!DEF_STUDENTS.find(d=>d.username===s.username))];
-    const staffList=[...DEF_STAFF,...(lsGet('afcll_v2_staff')||[]).filter(s=>!DEF_STAFF.find(d=>d.username===s.username))];
+    const students=DEF_STUDENTS;
+    const staffList=DEF_STAFF;
     if(mode==='student'){
       const f=pinMode==='pin'
-        ?students.find(s=>s.pin.replace(/^0+/,'')===input.replace(/^0+/,''))
+        ?students.find(s=>s.pin===input||s.pin===input.padStart(4,'0')||s.pin.replace(/^0+/,'')===input.replace(/^0+/,''))
         :students.find(s=>s.username.toLowerCase()===usernameInput.toLowerCase().trim());
       if(f){onLogin({role:'student',user:f});}else setError(pinMode==='pin'?'PIN not found.':'Username not found.');
     } else if(mode==='staff'){
-      const staffMember=staffList.find(s=>s.username.toLowerCase()===usernameInput.toLowerCase().trim()&&s.pin.replace(/^0+/,'')===input.replace(/^0+/,''));
+      // Staff login: username + PIN
+      const staffMember=staffList.find(s=>s.username.toLowerCase()===usernameInput.toLowerCase().trim()&&(s.pin===input||s.pin===input.padStart(4,'0')||s.pin.replace(/^0+/,'')===input.replace(/^0+/,'')));
       if(staffMember){
         onLogin({role:staffMember.role==='admin'?'admin':'staff',user:staffMember});
       } else {
@@ -193,7 +185,7 @@ function LoginScreen({onLogin}){
       <p style={{color:'rgba(255,255,255,0.6)',fontSize:'0.9rem',marginBottom:'2.5rem',textAlign:'center',fontFamily:"'Barlow Condensed',sans-serif"}}>AFC Lancaster Lions Initiative</p>
       <div style={{display:'flex',flexDirection:'column',gap:'0.75rem',width:'100%',maxWidth:300}}>
         {[['student','👩‍🎓','Student','Check in & track your day'],['staff','👩‍💼','Staff / Admin','Manage attendance & students'],['parent','👨‍👩‍👧','Parent','View your child\u2019s progress']].map(([r,icon,label,sub])=>(
-          <button key={r} onClick={()=>{setMode(r);setInput('');setUsernameInput('');setError('');setPinMode('pin');}}
+          <button key={r} onClick={()=>{setMode(r);setInput('');setUsernameInput('');setError('');}}
             style={{background:'rgba(255,255,255,0.09)',border:'1.5px solid rgba(255,255,255,0.15)',borderRadius:12,
               padding:'1rem 1.2rem',display:'flex',alignItems:'center',gap:'1rem',cursor:'pointer',color:'white',textAlign:'left'}}>
             <span style={{fontSize:'1.6rem'}}>{icon}</span>
@@ -213,9 +205,7 @@ function LoginScreen({onLogin}){
         {pinMode==='pin'?(
           <>
             <p style={{color:'rgba(255,255,255,0.6)',fontSize:'0.8rem',margin:'0.25rem 0 0'}}>Enter your 4-digit PIN</p>
-            <div style={{textAlign:'center',letterSpacing:'0.4rem',fontSize:'1.8rem',fontWeight:700,color:'var(--gold)',minHeight:'2.2rem',marginBottom:'0.25rem',fontFamily:'monospace'}}>
-              {input||<span style={{color:'rgba(255,255,255,0.2)',fontSize:'0.9rem',letterSpacing:'normal'}}>enter PIN</span>}
-            </div>
+            {pinDots(input)}
             {numPad(input,setInput)}
           </>
         ):(
@@ -248,9 +238,7 @@ function LoginScreen({onLogin}){
           placeholder="Username" autoFocus
           style={{width:'100%',padding:'10px 14px',borderRadius:8,border:'none',fontSize:'1rem',outline:'none'}}/>
         <p style={{color:'rgba(255,255,255,0.5)',fontSize:'0.78rem',marginTop:'0.5rem',marginBottom:0}}>PIN</p>
-        <div style={{textAlign:'center',letterSpacing:'0.4rem',fontSize:'1.6rem',fontWeight:700,color:'var(--gold)',minHeight:'2rem',marginBottom:'0.25rem',fontFamily:'monospace'}}>
-          {input||<span style={{color:'rgba(255,255,255,0.2)',fontSize:'0.9rem',letterSpacing:'normal'}}>tap numbers below</span>}
-        </div>
+        {pinDots(input)}
         {numPad(input,setInput)}
         {error&&<p style={{color:'#f87171',fontSize:'0.82rem',margin:'0.25rem 0'}}>{error}</p>}
         <Btn variant="gold" onClick={go} style={{width:'100%',marginTop:'0.5rem'}}>Login</Btn>
@@ -629,7 +617,7 @@ function SheetsSetup({students}){
 
 // ── STAFF ────────────────────────────────────────────────────────────────────
 function StaffDashboard({session,onLogout}){
-  const [tab,setTab]=useState('overview');
+  const [tab,setTab]=useState('confirm');
   const [students]=useState(()=>lsGet('afcll_v2_students')||DEF_STUDENTS);
   const [att,setAtt]=useState(()=>lsGet('afcll_v2_att')||[]);
   const [hw]=useState(()=>lsGet('afcll_v2_hw')||[]);
@@ -712,7 +700,7 @@ function StaffDashboard({session,onLogout}){
       </div>
 
       <div style={{display:'flex',gap:3,padding:'0 0.875rem',marginBottom:'0.6rem',overflowX:'auto'}}>
-        {[['overview','Overview'],['attendance','Attendance'],['students','Students'],['reports','Reports'],['settings','⚙ Setup']].map(([t,l])=>(
+        {[['⏳ Confirm','confirm'],['Overview','overview'],['Attendance','attendance'],['Students','students'],['Reports','reports']].map(([l,t])=>(
           <button key={t} onClick={()=>setTab(t)} style={{padding:'7px 13px',border:'none',borderRadius:7,whiteSpace:'nowrap',
             fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,fontSize:'0.83rem',cursor:'pointer',
             background:tab===t?'var(--navy)':'transparent',color:tab===t?'#fff':'var(--muted)'}}>
@@ -794,6 +782,40 @@ function StaffDashboard({session,onLogout}){
               {students.filter(s=>!att.find(a=>a.studentId===s.id&&a.date===today())).length===0&&(
                 <p style={{color:'var(--muted)',fontSize:'0.83rem',textAlign:'center',padding:'0.5rem'}}>All students accounted for today.</p>
               )}
+            </Card>
+          </div>
+        )}
+                {tab==='confirm'&&(
+          <div style={{display:'flex',flexDirection:'column',gap:'0.6rem'}}>
+            <Card>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'0.75rem'}}>
+                <h3 style={{fontSize:'1.2rem'}}>Today's Check-Ins</h3>
+                <span style={{fontSize:'0.78rem',color:'var(--muted)'}}>{fmtDate(today())}</span>
+              </div>
+              {pendingToday.length===0&&confirmedToday.length===0&&(
+                <p style={{textAlign:'center',color:'var(--muted)',fontSize:'0.85rem',padding:'1.5rem 0'}}>No check-ins yet today.</p>
+              )}
+              {pendingToday.map(a=>{const s=students.find(x=>x.id===a.studentId);return s?(
+                <div key={a.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.65rem',background:'#fffbeb',borderRadius:8,marginBottom:6,border:'1.5px solid #fcd34d'}}>
+                  <div><p style={{fontWeight:600,fontSize:'0.86rem'}}>{s.name}</p><p style={{color:'var(--muted)',fontSize:'0.74rem'}}>Gr {s.grade} - {a.time} - Pending</p></div>
+                  <Btn variant="success" size="sm" onClick={()=>confirmAtt(a.id)}>Confirm</Btn>
+                </div>
+              ):null;})}
+              {confirmedToday.map(a=>{const s=students.find(x=>x.id===a.studentId);return s?(
+                <div key={a.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.65rem',background:'#f0fdf4',borderRadius:8,marginBottom:6,border:'1.5px solid #86efac'}}>
+                  <div><p style={{fontWeight:600,fontSize:'0.86rem'}}>{s.name}</p><p style={{color:'var(--muted)',fontSize:'0.74rem'}}>Gr {s.grade} - Confirmed {a.confirmedAt||a.time}</p></div>
+                  <Btn variant="ghost" size="sm" onClick={()=>unconfirmAtt(a.id)}>Undo</Btn>
+                </div>
+              ):null;})}
+            </Card>
+            <Card>
+              <h3 style={{fontSize:'1.05rem',marginBottom:'0.5rem'}}>Not checked in today</h3>
+              {students.filter(s=>!att.find(a=>a.studentId===s.id&&a.date===today())).map(s=>(
+                <div key={s.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.6rem',background:'var(--bg)',borderRadius:8,marginBottom:5}}>
+                  <span style={{fontSize:'0.84rem'}}>{s.name} - Gr {s.grade}</span>
+                  <Btn variant="primary" size="sm" onClick={()=>markPresent(s.id)}>Mark Present</Btn>
+                </div>
+              ))}
             </Card>
           </div>
         )}
